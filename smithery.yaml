@@ -8,6 +8,6 @@ startCommand:
 
 transport: streamable-http
 port: 8081
-path: /mcp        # POST/GET/DELETE
-ssePath: /mcp     # (Smithery uses same path for SSE when streamable-http)
+path: /mcp      # POST/GET/DELETE happen on the same path
+ssePath: /mcp
 health: /

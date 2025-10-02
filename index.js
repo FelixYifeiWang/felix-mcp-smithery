@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { isInitializeRequest, z } from "@modelcontextprotocol/sdk/types.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 // ----- Build your MCP server (tools/resources/prompts) -----
 function buildServer() {
@@ -36,6 +37,21 @@ function buildServer() {
     })
   );
 
+  // weather(city) — simple passthrough to wttr.in
+  server.registerTool(
+    "weather",
+    {
+      title: "Weather",
+      description: "Get current weather for a city (wttr.in)",
+      inputSchema: { city: z.string() }
+    },
+    async ({ city }) => {
+      const r = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=3`);
+      const text = await r.text();
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
   return server;
 }
 
@@ -44,11 +60,9 @@ const app = express();
 const PORT = process.env.PORT || 8081;
 
 app.use(express.json());
-
-// CORS is important for remote/hosted runners (expose Mcp-Session-Id)
 app.use(
   cors({
-    origin: "*",                 // tighten in production
+    origin: "*",
     exposedHeaders: ["Mcp-Session-Id"],
     allowedHeaders: ["Content-Type", "mcp-session-id", "Mcp-Session-Id"]
   })
@@ -64,7 +78,7 @@ app.get("/", (_req, res) => res.status(200).send("felix-mcp is alive"));
 // POST /mcp — client→server messages, and init when no session yet
 app.post("/mcp", async (req, res) => {
   try {
-    const sessionId = /** @type {string | undefined} */ (
+    const sessionId = /** @type {string|undefined} */ (
       req.headers["mcp-session-id"] || req.headers["Mcp-Session-Id"]
     );
 
@@ -79,10 +93,8 @@ app.post("/mcp", async (req, res) => {
         }
       });
 
-      // Build a fresh MCP server for this transport
       const server = buildServer();
 
-      // Clean up when closed
       transport.onclose = () => {
         if (transport.sessionId) delete transports[transport.sessionId];
         try { server.close?.(); } catch {}
@@ -115,7 +127,7 @@ app.post("/mcp", async (req, res) => {
 
 // GET /mcp — server→client streaming (SSE)
 app.get("/mcp", async (req, res) => {
-  const sessionId = /** @type {string | undefined} */ (req.headers["mcp-session-id"]);
+  const sessionId = /** @type {string|undefined} */ (req.headers["mcp-session-id"]);
   const transport = sessionId && transports[sessionId];
   if (!transport) return res.status(400).send("Invalid or missing session ID");
   await transport.handleRequest(req, res);
@@ -123,7 +135,7 @@ app.get("/mcp", async (req, res) => {
 
 // DELETE /mcp — end session
 app.delete("/mcp", async (req, res) => {
-  const sessionId = /** @type {string | undefined} */ (req.headers["mcp-session-id"]);
+  const sessionId = /** @type {string|undefined} */ (req.headers["mcp-session-id"]);
   const transport = sessionId && transports[sessionId];
   if (!transport) return res.status(400).send("Invalid or missing session ID");
   transport.close();
