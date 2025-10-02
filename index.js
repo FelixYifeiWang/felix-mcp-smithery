@@ -6,7 +6,7 @@ import http from "http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 
-// ---- MCP server with your tools ----
+// --- Define MCP tools ---
 const mcp = new Server(
   { name: "felix-mcp", version: "1.0.0" },
   {
@@ -33,18 +33,17 @@ const mcp = new Server(
           return `Weather in ${city}: ${await resp.text()}`;
         },
       },
-      // You can add summarize back after scan succeeds
-      // summarize: { ... }
+      // You can add summarize back after scan succeeds (remember OPENAI_API_KEY)
     },
   }
 );
 
-// ---- Native HTTP server; mount MCP SSE at /mcp ----
+// --- Native HTTP server; mount SSE at /mcp ---
 const server = http.createServer((req, res) => {
   if (req.url === "/mcp") {
     console.log("[/mcp] incoming connection");
-    // IMPORTANT: use { request, response } keys
-    const transport = new SSEServerTransport({ request: req, response: res });
+    // IMPORTANT: pass positional (req, res), not an object
+    const transport = new SSEServerTransport(req, res);
     mcp.connect(transport);
     return;
   }
