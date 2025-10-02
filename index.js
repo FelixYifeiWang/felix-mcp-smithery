@@ -6,8 +6,8 @@ import http from "http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 
-// Define your MCP tools
-const mcpServer = new Server(
+// ---- MCP server with your tools ----
+const mcp = new Server(
   { name: "felix-mcp", version: "1.0.0" },
   {
     tools: {
@@ -17,14 +17,12 @@ const mcpServer = new Server(
         outputSchema: { type: "string" },
         handler: async ({ name }) => `Hello, ${name}! 👋`,
       },
-
       randomNumber: {
         description: "Return a random integer up to max (default 100)",
         inputSchema: { type: "object", properties: { max: { type: "number" } } },
         outputSchema: { type: "number" },
         handler: async ({ max = 100 }) => Math.floor(Math.random() * max),
       },
-
       weather: {
         description: "Get current weather for a city",
         inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
@@ -35,26 +33,28 @@ const mcpServer = new Server(
           return `Weather in ${city}: ${await resp.text()}`;
         },
       },
+      // You can add summarize back after scan succeeds
+      // summarize: { ... }
     },
   }
 );
 
-// Create native HTTP server
+// ---- Native HTTP server; mount MCP SSE at /mcp ----
 const server = http.createServer((req, res) => {
   if (req.url === "/mcp") {
     console.log("[/mcp] incoming connection");
-    const transport = new SSEServerTransport({ req, res });
-    mcpServer.connect(transport);
+    // IMPORTANT: use { request, response } keys
+    const transport = new SSEServerTransport({ request: req, response: res });
+    mcp.connect(transport);
     return;
   }
 
-  // Health check / fallback route
+  // Health/fallback
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("felix-mcp is alive");
 });
 
-// Listen on provided port
-const port = process.env.PORT || 3000;
+const port = Number(process.env.PORT || 3000);
 server.listen(port, "0.0.0.0", () => {
   console.log(`✅ MCP listening on http://0.0.0.0:${port}/mcp`);
 });
