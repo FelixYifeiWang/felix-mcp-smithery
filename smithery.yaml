@@ -1,29 +1,33 @@
-# Smithery configuration file
-# Docs: https://smithery.ai/docs/build/project-config
-# Minimal config: start MCP via STDIO; Smithery exposes it remotely.
+# smithery.yaml — streamable HTTP deployment (custom container)
+# Docs: project config + custom container
+# https://smithery.ai/docs/build/project-config
+# https://smithery.ai/docs/build/deployments/custom-container
+
+name: felix-mcp
+version: 1.0.0
+description: "Felix MCP server exposing hello, randomNumber, weather, and OpenAI summarize."
+
+# Containerized project (Dockerfile at repo root)
+runtime:
+  type: node
+  version: 20.x
+
+build:
+  command: npm ci --omit=dev || npm install --omit=dev
 
 startCommand:
-  type: stdio
-  commandFunction: |-
-    (config) => ({
-      command: 'node',
-      args: ['index.js'],
-      env: {
-        OPENAI_API_KEY: config.openaiApiKey,
-        ENABLE_STDIO: '1'
-      }
-    })
+  type: http
+  command: ["node", "index.js"]
+  port: 3000   # must match process.env.PORT in your server
 
-configSchema:
-  # What users (or you) must provide in Smithery UI to run the server
-  type: object
-  required: [openaiApiKey]
-  properties:
-    openaiApiKey:
-      type: string
-      title: "OpenAI API Key"
-      description: "API key used by the summarize tool"
+deploy:
+  type: http
+  port: 3000
+  endpoint: /mcp   # MCP over Streamable HTTP/SSE lives here
 
-description: "Felix MCP server (hello, randomNumber, weather, summarize w/ OpenAI)."
-exampleConfig:
-  openaiApiKey: "sk-xxxxx"
+# Environment configuration exposed in Smithery UI
+config:
+  - name: OPENAI_API_KEY
+    type: string
+    secret: true
+    description: "OpenAI key for summarize tool"
