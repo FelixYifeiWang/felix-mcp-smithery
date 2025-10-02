@@ -1,33 +1,21 @@
-# smithery.yaml — streamable HTTP deployment (custom container)
-# Docs: project config + custom container
-# https://smithery.ai/docs/build/project-config
-# https://smithery.ai/docs/build/deployments/custom-container
-
+# smithery.yaml — Minimal Node HTTP deployment on /mcp
 name: felix-mcp
 version: 1.0.0
 description: "Felix MCP server exposing hello, randomNumber, weather, and OpenAI summarize."
 
-# Containerized project (Dockerfile at repo root)
-runtime:
-  type: node
-  version: 20.x
-
-build:
-  command: npm ci --omit=dev || npm install --omit=dev
-
+# Start your app as an HTTP server; Smithery will route to it
 startCommand:
   type: http
   command: ["node", "index.js"]
-  port: 3000   # must match process.env.PORT in your server
+  port: 3000
 
+# Tell Smithery which HTTP port/path is your MCP endpoint
 deploy:
   type: http
   port: 3000
-  endpoint: /mcp   # MCP over Streamable HTTP/SSE lives here
+  endpoint: /mcp
 
-# Environment configuration exposed in Smithery UI
-config:
+# Environment variables you set in Smithery UI
+environment:
   - name: OPENAI_API_KEY
-    type: string
     secret: true
-    description: "OpenAI key for summarize tool"
