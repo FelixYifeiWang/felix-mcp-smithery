@@ -1,6 +1,15 @@
 kind: server
 name: felix-mcp-smithery
 version: 1.0.0
+
+# You are deploying a Docker container
+runtime: container
+
+# REQUIRED for container runtime: how the server starts inside the container
+startCommand:
+  type: http   # tells Smithery this is a Streamable HTTP/JSON-RPC server
+
+# Transport wiring so Smithery runner knows how to talk to you
 transport: streamable-http
 port: 8081
 path: /mcp

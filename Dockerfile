@@ -1,22 +1,15 @@
 FROM node:20
-
 WORKDIR /app
 ENV NODE_ENV=production PORT=8081
 
-# Install deps (works with or without lockfile)
+# deps (works with or without lockfile)
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then \
-      npm ci --omit=dev; \
-    else \
-      npm install --omit=dev; \
-    fi
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
-# Copy app
+# app
 COPY . .
 
 EXPOSE 8081
-
-# Helpful healthcheck so the platform knows we're up
 HEALTHCHECK --interval=10s --timeout=3s --retries=12 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8081)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "index.js"]
