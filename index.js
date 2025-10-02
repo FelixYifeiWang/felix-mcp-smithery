@@ -11,7 +11,6 @@ import { z } from "zod";
 function buildServer() {
   const server = new McpServer({ name: "felix-mcp", version: "1.0.0" });
 
-  // hello(name)
   server.registerTool(
     "hello",
     {
@@ -24,7 +23,6 @@ function buildServer() {
     })
   );
 
-  // randomNumber(max=100)
   server.registerTool(
     "randomNumber",
     {
@@ -37,7 +35,6 @@ function buildServer() {
     })
   );
 
-  // weather(city) — simple passthrough to wttr.in
   server.registerTool(
     "weather",
     {
@@ -69,8 +66,8 @@ app.use(
 );
 
 // Maintain transports per session
-/** @type {Record<string, StreamableHTTPServerTransport>} */
-const transports = {};
+/** @type {Record<string, { transport: StreamableHTTPServerTransport, server: McpServer }>} */
+const sessions = {};
 
 // Health
 app.get("/", (_req, res) => res.status(200).send("felix-mcp is alive"));
@@ -78,32 +75,34 @@ app.get("/", (_req, res) => res.status(200).send("felix-mcp is alive"));
 // POST /mcp — client→server messages, and init when no session yet
 app.post("/mcp", async (req, res) => {
   try {
-    const sessionId = /** @type {string|undefined} */ (
-      req.headers["mcp-session-id"] || req.headers["Mcp-Session-Id"]
-    );
-
-    let transport = sessionId ? transports[sessionId] : undefined;
+    const sessionIdHeader =
+      /** @type {string|undefined} */ (req.headers["mcp-session-id"] || req.headers["Mcp-Session-Id"]);
+    const existing = sessionIdHeader ? sessions[sessionIdHeader] : undefined;
 
     // New session on first initialize
-    if (!transport && isInitializeRequest(req.body)) {
-      transport = new StreamableHTTPServerTransport({
+    if (!existing && isInitializeRequest(req.body)) {
+      const server = buildServer();
+      const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
-          transports[sid] = transport;
+          sessions[sid] = { transport, server };
         }
       });
 
-      const server = buildServer();
-
+      // IMPORTANT: avoid close recursion — do NOT call server.close() here
       transport.onclose = () => {
-        if (transport.sessionId) delete transports[transport.sessionId];
-        try { server.close?.(); } catch {}
+        const sid = transport.sessionId;
+        if (sid && sessions[sid]) {
+          delete sessions[sid];
+        }
       };
 
       await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+      return;
     }
 
-    if (!transport) {
+    if (!existing) {
       res.status(400).json({
         jsonrpc: "2.0",
         error: { code: -32000, message: "Bad Request: No valid session ID provided" },
@@ -112,7 +111,7 @@ app.post("/mcp", async (req, res) => {
       return;
     }
 
-    await transport.handleRequest(req, res, req.body);
+    await existing.transport.handleRequest(req, res, req.body);
   } catch (err) {
     console.error("POST /mcp error:", err);
     if (!res.headersSent) {
@@ -127,19 +126,29 @@ app.post("/mcp", async (req, res) => {
 
 // GET /mcp — server→client streaming (SSE)
 app.get("/mcp", async (req, res) => {
-  const sessionId = /** @type {string|undefined} */ (req.headers["mcp-session-id"]);
-  const transport = sessionId && transports[sessionId];
-  if (!transport) return res.status(400).send("Invalid or missing session ID");
-  await transport.handleRequest(req, res);
+  const sid = /** @type {string|undefined} */ (req.headers["mcp-session-id"]);
+  const sess = sid && sessions[sid];
+  if (!sess) return res.status(400).send("Invalid or missing session ID");
+  await sess.transport.handleRequest(req, res);
 });
 
 // DELETE /mcp — end session
 app.delete("/mcp", async (req, res) => {
-  const sessionId = /** @type {string|undefined} */ (req.headers["mcp-session-id"]);
-  const transport = sessionId && transports[sessionId];
-  if (!transport) return res.status(400).send("Invalid or missing session ID");
-  transport.close();
+  const sid = /** @type {string|undefined} */ (req.headers["mcp-session-id"]);
+  const sess = sid && sessions[sid];
+  if (!sess) return res.status(400).send("Invalid or missing session ID");
+  // Close the transport; onclose will clean up the map entry
+  sess.transport.close();
   res.status(204).end();
+});
+
+// Optional: graceful shutdown without recursion
+process.on("SIGTERM", () => {
+  for (const sid of Object.keys(sessions)) {
+    try { sessions[sid].transport.close(); } catch {}
+    delete sessions[sid];
+  }
+  process.exit(0);
 });
 
 app.listen(PORT, "0.0.0.0", () => {
