@@ -10,10 +10,10 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 // import OpenAI from "openai";  // We'll lazy-create inside handler
 
 const app = express();
-app.use(express.json());
+app.get("/", (_req, res) => res.status(200).send("felix-mcp is alive"));
 
 // --- MCP server with your tools ---
-const server = new Server(
+const mcpServer = new Server(
   { name: "felix-mcp", version: "1.0.0" },
   {
     tools: {
@@ -69,19 +69,18 @@ const server = new Server(
   }
 );
 
-// --- Streamable HTTP via SSE at /mcp (REQUIRED by Smithery) ---
-app.all("/mcp", (req, res) => {
-  console.log("[/mcp] incoming connection");
-  const transport = new SSEServerTransport({ req, res });
-  server.connect(transport);
+// Create native HTTP server
+const httpServer = http.createServer((req, res) => {
+  if (req.url === "/mcp") {
+    const transport = new SSEServerTransport({ req, res });
+    mcpServer.connect(transport);
+  } else {
+    app(req, res); // delegate everything else to Express
+  }
 });
 
-// Health endpoint so Smithery can probe quickly
-app.get("/", (_req, res) => res.status(200).send("felix-mcp is alive"));
-
-// Bind on 0.0.0.0 and the port Smithery provides
-const port = Number(process.env.PORT || 3000);
-app.listen(port, "0.0.0.0", () => {
-  console.log(`✅ MCP server listening on 0.0.0.0:${port}  (SSE at /mcp)`);
-  console.log(`ENV check -> PORT=${process.env.PORT} OPENAI=${process.env.OPENAI_API_KEY ? "set" : "missing"}`);
+// Start listening
+const port = process.env.PORT || 3000;
+httpServer.listen(port, "0.0.0.0", () => {
+  console.log(`✅ MCP listening on http://0.0.0.0:${port}/mcp`);
 });
