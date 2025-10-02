@@ -7,6 +7,42 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
+// ...top imports remain the same...
+import { z } from "zod";
+
+// Small helper to call OpenAI chat completions
+async function openaiSummarize({ text, maxSentences = 3, model = "gpt-4o-mini" }) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not set on the server");
+  }
+
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: `You are a crisp summarizer. Limit to ${maxSentences} sentence(s). Be faithful, clear, and concise.` },
+      { role: "user", content: text }
+    ],
+    temperature: 0.2
+  };
+
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  const j = await r.json();
+  if (!r.ok) {
+    // Surface a readable error to the MCP client
+    const msg = j?.error?.message || JSON.stringify(j);
+    throw new Error(`OpenAI error: ${msg}`);
+  }
+  return j.choices?.[0]?.message?.content?.trim() || "No summary.";
+}
+
 // ----- Build your MCP server (tools/resources/prompts) -----
 function buildServer() {
   const server = new McpServer({ name: "felix-mcp", version: "1.0.0" });
@@ -46,6 +82,23 @@ function buildServer() {
       const r = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=3`);
       const text = await r.text();
       return { content: [{ type: "text", text }] };
+    }
+  );
+
+  server.registerTool(
+    "summarize",
+    {
+      title: "Summarize",
+      description: "Summarize text using OpenAI (default 1–3 sentences). Requires OPENAI_API_KEY.",
+      inputSchema: {
+        text: z.string().min(1, "Provide text to summarize"),
+        maxSentences: z.number().int().min(1).max(6).optional(),
+        model: z.string().optional()
+      }
+    },
+    async ({ text, maxSentences = 3, model = "gpt-4o-mini" }) => {
+      const summary = await openaiSummarize({ text, maxSentences, model });
+      return { content: [{ type: "text", text: summary }] };
     }
   );
 
