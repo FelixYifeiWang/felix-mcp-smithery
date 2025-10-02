@@ -1,26 +1,22 @@
-# ---- Base image ----
 FROM node:20
 
-# Ensure consistent working dir
 WORKDIR /app
+ENV NODE_ENV=production PORT=8081
 
-# ---- Dependency install (cacheable) ----
-# Copy only manifests first to maximize layer caching
-COPY package.json package-lock.json ./
+# Install deps (works with or without lockfile)
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then \
+      npm ci --omit=dev; \
+    else \
+      npm install --omit=dev; \
+    fi
 
-# Bust cache intentionally when needed (bump this number if builds get "stuck")
-ARG BUILD_REV=1
-ENV BUILD_REV=${BUILD_REV}
-
-# Install production deps
-RUN npm ci --omit=dev || npm install --omit=dev
-
-# ---- App source ----
+# Copy app
 COPY . .
 
-# Environment & port
-ENV NODE_ENV=production
-EXPOSE 3000
+EXPOSE 8081
 
-# ---- Start ----
+# Helpful healthcheck so the platform knows we're up
+HEALTHCHECK --interval=10s --timeout=3s --retries=12 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8081)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD ["node", "index.js"]

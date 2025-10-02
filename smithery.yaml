@@ -1,18 +1,8 @@
-# smithery.yaml
-name: felix-mcp
+kind: server
+name: felix-mcp-smithery
 version: 1.0.0
-description: "Felix MCP server exposing hello, randomNumber, weather, and OpenAI summarize."
-
-startCommand:
-  type: http
-  command: ["node", "index.js"]
-  port: 3000
-
-deploy:
-  type: http
-  port: 3000
-  endpoint: /mcp
-
-environment:
-  - name: OPENAI_API_KEY
-    secret: true
+transport: streamable-http
+port: 8081
+path: /mcp
+ssePath: /mcp/sse
+health: /
