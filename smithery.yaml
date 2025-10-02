@@ -1,0 +1,29 @@
+# Smithery configuration file
+# Docs: https://smithery.ai/docs/build/project-config
+# Minimal config: start MCP via STDIO; Smithery exposes it remotely.
+
+startCommand:
+  type: stdio
+  commandFunction: |-
+    (config) => ({
+      command: 'node',
+      args: ['index.js'],
+      env: {
+        OPENAI_API_KEY: config.openaiApiKey,
+        ENABLE_STDIO: '1'
+      }
+    })
+
+configSchema:
+  # What users (or you) must provide in Smithery UI to run the server
+  type: object
+  required: [openaiApiKey]
+  properties:
+    openaiApiKey:
+      type: string
+      title: "OpenAI API Key"
+      description: "API key used by the summarize tool"
+
+description: "Felix MCP server (hello, randomNumber, weather, summarize w/ OpenAI)."
+exampleConfig:
+  openaiApiKey: "sk-xxxxx"
