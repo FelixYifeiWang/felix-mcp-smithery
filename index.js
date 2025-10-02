@@ -7,9 +7,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-// ...top imports remain the same...
-import { z } from "zod";
-
 // Small helper to call OpenAI chat completions
 async function openaiSummarize({ text, maxSentences = 3, model = "gpt-4o-mini" }) {
   if (!process.env.OPENAI_API_KEY) {
