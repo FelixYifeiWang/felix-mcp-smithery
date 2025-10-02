@@ -1,21 +1,22 @@
-# smithery.yaml — Minimal Node HTTP deployment on /mcp
+# smithery.yaml  (repo root)
+# Docs: https://smithery.ai/docs/build/project-config
 name: felix-mcp
 version: 1.0.0
 description: "Felix MCP server exposing hello, randomNumber, weather, and OpenAI summarize."
 
-# Start your app as an HTTP server; Smithery will route to it
+# Start your server as an HTTP process
 startCommand:
   type: http
   command: ["node", "index.js"]
   port: 3000
 
-# Tell Smithery which HTTP port/path is your MCP endpoint
+# Tell Smithery which HTTP endpoint serves MCP
 deploy:
   type: http
   port: 3000
   endpoint: /mcp
 
-# Environment variables you set in Smithery UI
+# Env you’ll set in Smithery UI (kept secret there)
 environment:
   - name: OPENAI_API_KEY
     secret: true
