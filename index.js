@@ -1,13 +1,7 @@
-#!/usr/bin/env node
-import dotenv from "dotenv";
-dotenv.config();
-
+import http from "http";
 import express from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-// (Optional) keep stdio for local dev ONLY; do not enable in Smithery
-// import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-// import OpenAI from "openai";  // We'll lazy-create inside handler
 
 const app = express();
 app.get("/", (_req, res) => res.status(200).send("felix-mcp is alive"));
